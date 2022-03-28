@@ -1,0 +1,1 @@
+from .sparql import app
