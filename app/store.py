@@ -155,7 +155,7 @@ class IconclassStore(Store):
             for related in obj.get("R"):
                 yield (N, SKOS.related, IC[quote(related)]), None
         if p_(SKOS.broader) and "B" in obj:
-            yield (N, SKOS.broader, obj["B"]), None
+            yield (N, SKOS.broader, IC[quote(obj["B"])]), None
         if p_(SKOS.narrower) and "C" in obj:
             for child in obj.get("C", []):
                 yield (N, SKOS.narrower, IC[quote(child)]), None
