@@ -10,9 +10,8 @@ app = FastAPI()
 G = Graph(store="IconclassStore")
 
 
-@app.get(
-    "/sparqlfts",
-)
+@app.post("/sparql")
+@app.get("/sparql")
 def sparqlfts(query: str):
     result = G.query(query)
 
