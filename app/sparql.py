@@ -3,16 +3,15 @@ from rdflib import Graph
 from fastapi.responses import JSONResponse
 from io import StringIO
 import json
-from fastapi import FastAPI
+from fastapi import FastAPI, Form
 from .store import IconclassStore
 
 app = FastAPI()
 G = Graph(store="IconclassStore")
 
 
-@app.post("/sparql")
 @app.get("/sparql")
-def sparqlfts(query: str):
+def sparql_get(query: str):
     result = G.query(query)
 
     ser = JSONResultSerializer(result)
@@ -20,3 +19,8 @@ def sparqlfts(query: str):
     ser.serialize(buf)
 
     return JSONResponse(json.loads(buf.getvalue()))
+
+
+@app.post("/sparql")
+def sparql_post(query: str = Form(...)):
+    return sparql_get(query)
