@@ -1,3 +1,4 @@
+from numpy import r_
 from rdflib.plugins.sparql.evaluate import evalBGP
 from rdflib.plugins.sparql import CUSTOM_EVALS
 from rdflib.plugins.sparql.sparql import AlreadyBound
@@ -13,6 +14,8 @@ IC = Namespace("http://iconclass.org/")
 PREDICATE_FTS = IC.search
 PREDICATE_FTS_NOKEYS = IC.searchnokeys
 DATA_PATH = os.environ.get("IC_DATA_PATH", "../data/")
+
+MAX_EMPTY_SUBJECTS_ITERATION = 999
 
 
 def get_cursor():
@@ -56,11 +59,16 @@ def read_n(DATA_PATH):
                 del x["K"]
 
     # set the broader based on the C of the parents
+    # and set the reverse related as "RR"
     for n, obj in d.items():
         for c in obj.get("C", []):
             c_obj = d.get(c)
             if c_obj:
                 c_obj["B"] = n
+        for r in obj.get("R", []):
+            r_obj = d.get(r)
+            if r_obj:
+                r_obj.setdefault("RR", []).append(n)
 
     return d
 
@@ -129,36 +137,69 @@ CUSTOM_EVALS["fts_eval"] = fts_eval
 
 
 class IconclassStore(Store):
-    def __init__(self, configuration=None, identifier=None):
+    context_aware = True
 
+    def __init__(self, configuration=None, identifier=None):
+        self.triple_call_count = 0
         self.NOTATIONS = read_n(DATA_PATH)
         super().__init__(configuration, identifier)
 
-    def triple_notation(self, notation, p):
+    def n_from_uri(self, u):
+        if u is None:
+            return
+        tmp = u.split(IC)
+        if len(tmp) != 2:
+            return
+        n = tmp[-1]
+        if not n[0] in "0123456789":
+            return
+        return self.NOTATIONS.get(unquote(n))
+
+    def triple_notation(self, uriref, p, o):
+        if uriref is None and p is None and isinstance(o, URIRef):
+            obj = self.n_from_uri(o)
+            if not obj:
+                return
+            yield (IC[quote(obj["B"])], SKOS.narrower, o), None
+            for child in obj.get("C", []):
+                yield (IC[quote(child)], SKOS.broader, o), None
+            for rr in obj.get("RR", []):
+                yield (IC[quote(rr)], SKOS.related, o), None
+            return
+
+        obj = self.n_from_uri(uriref)
+        if not obj:
+            return
+        notation = obj["N"][0]
+
+        if o and p == RDF.type and o != SKOS.Concept:
+            return
+        if o and p == SKOS.notation and o != notation:
+            return
+
         def p_(tipe):
             if (p is None) or (p == tipe):
                 return True
 
-        if notation not in self.NOTATIONS:
-            return
-
-        obj = self.NOTATIONS[notation]
+        triples = []
 
         N = IC[quote(notation)]
         if p_(RDF.type):
-            yield (N, RDF.type, SKOS.Concept), None
+            triples.append((N, RDF.type, SKOS.Concept))
         if p_(SKOS.notation):
-            yield (N, SKOS.notation, Literal(notation)), None
+            triples.append((N, SKOS.notation, Literal(notation)))
         if p_(SKOS.inScheme):
-            yield (N, SKOS.inScheme, URIRef("http://iconclass.org/rdf/2011/09/")), None
+            triples.append(
+                (N, SKOS.inScheme, URIRef("http://iconclass.org/rdf/2011/09/"))
+            )
         if p_(SKOS.related) and "R" in obj:
             for related in obj.get("R"):
-                yield (N, SKOS.related, IC[quote(related)]), None
+                triples.append((N, SKOS.related, IC[quote(related)]))
         if p_(SKOS.broader) and "B" in obj:
-            yield (N, SKOS.broader, IC[quote(obj["B"])]), None
+            triples.append((N, SKOS.broader, IC[quote(obj["B"])]))
         if p_(SKOS.narrower) and "C" in obj:
             for child in obj.get("C", []):
-                yield (N, SKOS.narrower, IC[quote(child)]), None
+                triples.append((N, SKOS.narrower, IC[quote(child)]))
 
         cursor = get_cursor()
         if p_(SKOS.prefLabel):
@@ -166,32 +207,79 @@ class IconclassStore(Store):
                 "SELECT * FROM txts WHERE notation = ?", (notation,)
             ):
                 _, lang, txt = t
-                yield (N, SKOS.prefLabel, Literal(txt, lang=lang)), None
+                triples.append((N, SKOS.prefLabel, Literal(txt, lang=lang)))
         if p_(DC.subject):
             for t in cursor.execute(
                 "SELECT * FROM kwds WHERE notation = ?", (notation,)
             ):
                 _, lang, kws = t
                 for kw in kws.split("\n"):
-                    yield (N, DC.subject, Literal(kw, lang=lang)), None
+                    triples.append((N, DC.subject, Literal(kw, lang=lang)))
+
+        for t in triples:
+            if p is None and o is None:
+                yield t, None
+            elif p is None and o == t[2]:
+                yield t, None
+            elif p == t[1] and o == t[2]:
+                yield t, None
+            elif p == t[1] and o is None:
+                yield t, None
+
+    def triple_predicate_object(self, p, o):
+        obj = self.n_from_uri(o)
+        if not obj:
+            return
+        if p == SKOS.broader:
+            for child in obj.get("C", []):
+                yield (IC[quote(child)], SKOS.broader, o), None
+        if p == SKOS.narrower:
+            yield (IC[quote(obj["B"])], SKOS.narrower, o), None
+
+        cursor = get_cursor()
+        if p == SKOS.prefLabel and isinstance(o, Literal):
+            if o.language:
+                res = cursor.execute(
+                    "SELECT * FROM txts WHERE txt = ? AND lang = ?", (o, o.language)
+                )
+            else:
+                res = cursor.execute("SELECT * FROM txts WHERE txt = ?", (o,))
+            for t in res:
+                notation, lang, _ = t
+                yield (IC[quote(notation)], SKOS.prefLabel, o), None
+        if p == DC.subject and isinstance(o, Literal):
+            if o.language:
+                res = cursor.execute(
+                    "SELECT * FROM kwds WHERE kw = ? AND lang = ?", (o, o.language)
+                )
+            else:
+                res = cursor.execute("SELECT * FROM kwds WHERE kw = ?", (o,))
+            for t in res:
+                notation, lang, _ = t
+                yield (IC[quote(notation)], DC.subject, o), None
 
     def triples(self, triple_pattern, context=None):
+        self.triple_call_count += 1
         s, p, o = triple_pattern
 
         if s is None:
-            for n in self.NOTATIONS:
-                for x in self.triple_notation(n, p):
+            if not p is None and not o is None:
+                for x in self.triple_predicate_object(p, o):
                     yield x
+            elif p is None and not o is None:
+                for x in self.triple_notation(s, p, o):
+                    yield x
+            else:
+                # add in a max # iterations here, the limit is not taken into account
+                count = 0
+                for n in self.NOTATIONS:
+                    count += 1
+                    if count > MAX_EMPTY_SUBJECTS_ITERATION:
+                        continue
+                    for x in self.triple_notation(IC[quote(n)], p, None):
+                        yield x
         else:
-            # Is this is an ICONCLASS URI?
-            tmp = s.split("http://iconclass.org/")
-            if len(tmp) != 2:
-                return
-            n = tmp[-1]
-            if not n[0] in "0123456789":
-                return
-            n = unquote(n)
-            for x in self.triple_notation(n, p):
+            for x in self.triple_notation(s, p, o):
                 yield x
 
 
