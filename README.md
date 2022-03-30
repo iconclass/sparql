@@ -15,7 +15,13 @@ This repository contains a custom [Python RDFlib](https://rdflib.readthedocs.io/
 
 ## This is a work in progress and not Done yet! 🍴
 
-A tested endpoint is available at [https://test.iconclass.org/sparql](https://test.iconclass.org/sparql)
+An endpoint is available at [https://test.iconclass.org/sparql](https://test.iconclass.org/sparql)
 DISCLAIMER: it may go down, it may be unresponsive, there is no crack super devops team that has made it foolproof. (yet)
 
-But we are hard at work crossing the t's and dotting the i's, if you encounter bugs, [please let me know](https://forms.gle/twPq7swQZXmSX46G8) or you can mail me on info@iconclass.org or file some issues in this repo. Or ideally, contribute fixes... ;-)
+But we are hard at work crossing the t's and dotting the i's, if you encounter bugs, [please let me know](https://forms.gle/twPq7swQZXmSX46G8) or you can mail me on info@iconclass.org or file some issues in this repo.
+
+Or ideally, contribute some fixes in a pull request... 🎯
+
+# Credit
+
+Work on this service has been done with support from [FIZ Karlsruhe Information Service Engineering](https://www.fiz-karlsruhe.de/de/forschung/information-service-engineering) and [NFDI4Culture](https://nfdi4culture.de/)
