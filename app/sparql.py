@@ -26,7 +26,10 @@ def sparql_get(query: str):
     del QUERY_STATS[nonce]
     QUERY_STATS["total"] = total + 1
 
-    return JSONResponse(json.loads(buf.getvalue()))
+    r = JSONResponse(json.loads(buf.getvalue()))
+    r.headers["content-type"] = "application/sparql-results+json"
+
+    return r
 
 
 @app.post("/sparql")
