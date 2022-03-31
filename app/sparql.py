@@ -25,12 +25,13 @@ def sparql_get(query: str):
     if result.type == "CONSTRUCT":
         buf = result.graph.serialize(format="json-ld")
         r = JSONResponse(json.loads(buf))
+        r.headers["content-type"] = "application/ld+json"
     else:
         ser = JSONResultSerializer(result)
         buf = StringIO()
         ser.serialize(buf)
         r = JSONResponse(json.loads(buf.getvalue()))
-    r.headers["content-type"] = "application/sparql-results+json"
+        r.headers["content-type"] = "application/sparql-results+json"
 
     return r
 
