@@ -18,15 +18,18 @@ def sparql_get(query: str):
     QUERY_STATS[nonce] = {"start": time.time()}
     result = G.query(query)
 
-    ser = JSONResultSerializer(result)
-    buf = StringIO()
-    ser.serialize(buf)
-
     total = QUERY_STATS["total"]
     del QUERY_STATS[nonce]
     QUERY_STATS["total"] = total + 1
 
-    r = JSONResponse(json.loads(buf.getvalue()))
+    if result.type == "CONSTRUCT":
+        buf = result.graph.serialize(format="json-ld")
+        r = JSONResponse(json.loads(buf))
+    else:
+        ser = JSONResultSerializer(result)
+        buf = StringIO()
+        ser.serialize(buf)
+        r = JSONResponse(json.loads(buf.getvalue()))
     r.headers["content-type"] = "application/sparql-results+json"
 
     return r
