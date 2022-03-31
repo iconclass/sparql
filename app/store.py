@@ -1,5 +1,5 @@
 from numpy import r_
-from rdflib.plugins.sparql.evaluate import evalBGP
+from rdflib.plugins.sparql.evaluate import evalBGP, evalPart, _fillTemplate
 from rdflib.plugins.sparql import CUSTOM_EVALS
 from rdflib.plugins.sparql.sparql import AlreadyBound
 from rdflib.store import Store
@@ -120,6 +120,8 @@ def getq(ctx, vars):
 
 
 def fts_eval(ctx, part):
+    if part.name == "ConstructQuery":
+        return evalConstructQuery(ctx, part)
     if part.name != "BGP":
         raise NotImplementedError()
     vars = []
@@ -131,6 +133,28 @@ def fts_eval(ctx, part):
     if len(vars) > 0:
         return getq(ctx, vars)
     return evalBGP(ctx, part.triples)
+
+
+# This is copied verbatim from https://github.com/RDFLib/rdflib/blob/master/rdflib/plugins/sparql/evaluate.py#L537
+# To fix what seems like a bug, in the original for an empty template is done:
+# query.p.p.triples <- so this is possibly a temporary fix
+def evalConstructQuery(ctx, query):
+    template = query.template
+
+    if not template:
+        # a construct-where query
+        template = query.p.p.p.triples  # query->project->bgp ...
+
+    graph = Graph()
+
+    for c in evalPart(ctx, query.p):
+        graph += _fillTemplate(template, c)
+
+    res = {}
+    res["type_"] = "CONSTRUCT"
+    res["graph"] = graph
+
+    return res
 
 
 CUSTOM_EVALS["fts_eval"] = fts_eval
