@@ -25,3 +25,7 @@ Or ideally, contribute some fixes in a pull request... 🎯
 # Credit
 
 Work on this service has been done with support from [FIZ Karlsruhe Information Service Engineering](https://www.fiz-karlsruhe.de/de/forschung/information-service-engineering) and [NFDI4Culture](https://nfdi4culture.de/)
+
+### Related Work
+
+[rdflib-endpoint](https://github.com/vemonet/rdflib-endpoint) ✨️ SPARQL endpoint built with RDFLib to serve RDF files, machine learning models, or any other logic implemented in Python
