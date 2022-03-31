@@ -2,8 +2,8 @@ from rdflib.plugins.sparql.results.jsonresults import JSONResultSerializer
 from rdflib import ConjunctiveGraph, Graph
 from fastapi.responses import JSONResponse
 from io import StringIO
-import json
-from fastapi import FastAPI, Form, Query, Request, Response
+import json, httpx
+from fastapi import FastAPI, Form, Query, Request, Response, BackgroundTasks
 from .store import IconclassStore
 import random, time
 from typing import Optional
@@ -35,7 +35,12 @@ SERVICE_DESCRIPTION = """@prefix sd: <http://www.w3.org/ns/sparql-service-descri
 
 
 @app.get("/sparql")
-def sparql_get(request: Request, query: Optional[str] = Query(None)):
+async def sparql_get(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    query: Optional[str] = Query(None),
+):
+    background_tasks.add_task(rec_usage, request)
     nonce = "".join([random.choice("0123456789abcdef") for x in range(20)])
     QUERY_STATS[nonce] = {"start": time.time()}
 
@@ -72,10 +77,32 @@ def sparql_get(request: Request, query: Optional[str] = Query(None)):
 
 
 @app.post("/sparql")
-def sparql_post(request: Request, query: str = Form(...)):
+async def sparql_post(request: Request, query: str = Form(...)):
     return sparql_get(request, query)
 
 
 @app.get("/")
-def homepage():
+async def homepage():
     return {"status": "OK", "stats": QUERY_STATS}
+
+
+def rec_usage(request: Request):
+    xff = request.headers.get("x-forwarded-for")
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": request.headers.get("user-agent", "unknown"),
+        "X-Forwarded-For": "127.0.0.1",
+    }
+    if xff:
+        headers["X-Forwarded-For"] = xff
+    r = httpx.post(
+        "https://plausible.io/api/event",
+        headers=headers,
+        data=json.dumps(
+            {
+                "name": "pageview",
+                "url": "https://test.iconclass.org/sparql",
+                "domain": "test.iconclass.org",
+            }
+        ),
+    )
