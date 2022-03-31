@@ -44,16 +44,18 @@ async def sparql_get(
     nonce = "".join([random.choice("0123456789abcdef") for x in range(20)])
     QUERY_STATS[nonce] = {"start": time.time()}
 
+    accept_header = request.headers.get("accept", "")
+
     if not query:
         tmp_graph = Graph()
         tmp_graph.parse(data=SERVICE_DESCRIPTION, format="ttl")
-        if request.headers["accept"] == "text/turtle":
+        if accept_header == "application/xml":
             return Response(
-                tmp_graph.serialize(format="turtle"), media_type="text/turtle"
+                tmp_graph.serialize(format="xml"), media_type="application/xml"
             )
         else:
             return Response(
-                tmp_graph.serialize(format="xml"), media_type="application/xml"
+                tmp_graph.serialize(format="turtle"), media_type="text/turtle"
             )
 
     result = G.query(query)
@@ -63,9 +65,18 @@ async def sparql_get(
     QUERY_STATS["total"] = total + 1
 
     if result.type == "CONSTRUCT":
-        buf = result.graph.serialize(format="json-ld")
-        r = JSONResponse(json.loads(buf))
-        r.headers["content-type"] = "application/ld+json"
+        if accept_header == "application/ld+json":
+            buf = result.graph.serialize(format="json-ld")
+            r = JSONResponse(json.loads(buf))
+            r.headers["content-type"] = "application/ld+json"
+        elif accept_header == "application/xml":
+            buf = result.graph.serialize(format="xml")
+            r = Response(buf)
+            r.headers["content-type"] = "application/xml"
+        else:
+            buf = result.graph.serialize(format="ttl")
+            r = Response(buf)
+            r.headers["content-type"] = "text/turtle"
     else:
         ser = JSONResultSerializer(result)
         buf = StringIO()
@@ -77,12 +88,14 @@ async def sparql_get(
 
 
 @app.post("/sparql")
-async def sparql_post(request: Request, query: str = Form(...)):
-    return sparql_get(request, query)
+async def sparql_post(
+    request: Request, background_tasks: BackgroundTasks, query: str = Form(...)
+):
+    return await sparql_get(request, background_tasks, query)
 
 
 @app.get("/")
-async def homepage():
+def homepage():
     return {"status": "OK", "stats": QUERY_STATS}
 
 
