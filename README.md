@@ -33,3 +33,5 @@ Work on this service has been done with support from [FIZ Karlsruhe Information 
 [Hydra library for Python](https://github.com/pchampin/hydra-py) The primary goal is to provide a lib for easily writing Hydra-enabled clients
 
 [Python Linked Data Fragment Server.](https://github.com/jermnelson/linked-data-fragments) Python Linked Data Fragment server using asyncio and Redis
+
+[ODTMP-TPF](https://github.com/benj-moreau/odmtp-tpf) Triple pattern matching over non-RDF datasources with inference
