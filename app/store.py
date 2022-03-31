@@ -258,26 +258,32 @@ class IconclassStore(Store):
                 notation, lang, _ = t
                 yield (IC[quote(notation)], DC.subject, o), None
 
+    def notations_iterator(self, p, o):
+        count = 0
+        for n in self.NOTATIONS:
+            count += 1
+            if count > MAX_EMPTY_SUBJECTS_ITERATION:
+                continue
+            for x in self.triple_notation(IC[quote(n)], p, o):
+                yield x
+
     def triples(self, triple_pattern, context=None):
         self.triple_call_count += 1
         s, p, o = triple_pattern
 
         if s is None:
-            if not p is None and not o is None:
+            if p == RDF.type and o == SKOS.Concept:
+                for x in self.notations_iterator(p, None):
+                    yield x
+            elif not p is None and not o is None:
                 for x in self.triple_predicate_object(p, o):
                     yield x
             elif p is None and not o is None:
                 for x in self.triple_notation(s, p, o):
                     yield x
             else:
-                # add in a max # iterations here, the limit is not taken into account
-                count = 0
-                for n in self.NOTATIONS:
-                    count += 1
-                    if count > MAX_EMPTY_SUBJECTS_ITERATION:
-                        continue
-                    for x in self.triple_notation(IC[quote(n)], p, None):
-                        yield x
+                for x in self.notations_iterator(p, None):
+                    yield x
         else:
             for x in self.triple_notation(s, p, o):
                 yield x
