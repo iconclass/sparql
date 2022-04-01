@@ -30,6 +30,8 @@ Work on this service has been done with support from [FIZ Karlsruhe Information 
 
 [rdflib-endpoint](https://github.com/vemonet/rdflib-endpoint) ✨️ SPARQL endpoint built with RDFLib to serve RDF files, machine learning models, or any other logic implemented in Python
 
+[SPARQL endpoint for Translator services](https://github.com/vemonet/translator-sparql-service) A SPARQL endpoint to serve NCATS Translator services as SPARQL custom functions. Built with rdflib-endpoint
+
 [Hydra library for Python](https://github.com/pchampin/hydra-py) The primary goal is to provide a lib for easily writing Hydra-enabled clients
 
 [Python Linked Data Fragment Server.](https://github.com/jermnelson/linked-data-fragments) Python Linked Data Fragment server using asyncio and Redis
