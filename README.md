@@ -18,6 +18,8 @@ This repository contains a custom [Python RDFlib](https://rdflib.readthedocs.io/
 An endpoint is available at [https://test.iconclass.org/sparql](https://test.iconclass.org/sparql)
 DISCLAIMER: it may go down, it may be unresponsive, there is no crack super devops team that has made it foolproof. (yet)
 
+**<a href="https://yasgui.triply.cc/#query=PREFIX%20ic%3A%20%3Chttp%3A//iconclass.org/%3E%0ASELECT%20%3Fs%20%3Fp%20%3Fo%20%0AWHERE%20%7B%3Fs%20%3Fp%20%3Fo%7D&endpoint=https%3A//test.iconclass.org/sparql&requestMethod=GET&tabTitle=Query%209&headers=%7B%7D&contentTypeConstruct=application%2Fn-triples%2C*%2F*%3Bq%3D0.9&contentTypeSelect=application%2Fsparql-results%2Bjson%2C*%2F*%3Bq%3D0.9&outputFormat=table">Some test can be done with YASGUI</a>**
+
 But we are hard at work crossing the t's and dotting the i's, if you encounter bugs, [please let me know](https://forms.gle/twPq7swQZXmSX46G8) or you can mail me on info@iconclass.org or file some issues in this repo.
 
 Or ideally, contribute some fixes in a pull request... 🎯
