@@ -1,4 +1,3 @@
-from numpy import r_
 from rdflib.plugins.sparql.evaluate import evalBGP, evalPart, _fillTemplate
 from rdflib.plugins.sparql import CUSTOM_EVALS
 from rdflib.plugins.sparql.sparql import AlreadyBound
@@ -9,13 +8,15 @@ from rdflib.namespace import DC, SKOS, RDF
 from rdflib.plugin import register
 from urllib.parse import quote, unquote
 import os, sqlite3, textbase, re, sys
+import logging
 
 IC = Namespace("http://iconclass.org/")
 PREDICATE_FTS = IC.search
 PREDICATE_FTS_NOKEYS = IC.searchnokeys
 DATA_PATH = os.environ.get("IC_DATA_PATH", "../data/")
 
-MAX_EMPTY_SUBJECTS_ITERATION = 999
+MAX_EMPTY_SUBJECTS_ITERATION = 9
+FTS_QUERY_LIMIT = 9
 
 
 def get_cursor():
@@ -83,9 +84,9 @@ def do_search(q: str, lang: str, sort: str, keys: bool, r: str):
     else:
         keys = "is_key=0 AND "
     if q:
-        SQL = f"SELECT notation FROM {lang} WHERE {keys}text MATCH ? order by {sort}"
+        SQL = f"SELECT notation FROM {lang} WHERE {keys}text MATCH ? order by {sort} LIMIT {FTS_QUERY_LIMIT}"
     else:
-        SQL = f"SELECT notation FROM notations WHERE notation REGEXP ?"
+        SQL = f"SELECT notation FROM notations WHERE notation REGEXP ? LIMIT {FTS_QUERY_LIMIT}"
         q = r
     try:
         if len(r) > 0:
@@ -100,6 +101,16 @@ def do_search(q: str, lang: str, sort: str, keys: bool, r: str):
 
 def getq(ctx, vars):
     for var, qtipe, val in vars:
+        if not isinstance(var, Variable):
+            logging.error(f"{var} is not a Variable")
+            continue
+        if not qtipe in (PREDICATE_FTS, PREDICATE_FTS_NOKEYS):
+            logging.error(f"{qtipe} is not a IC search predicate")
+            continue
+        if not isinstance(val, Literal):
+            logging.error(f"{val} is not a Literal")
+            continue
+
         lang = val.language or "en"
         lang = lang[:2]
         sort = "rank"
@@ -108,6 +119,7 @@ def getq(ctx, vars):
         search_results = do_search(
             q=val, r="", lang=lang, sort=sort, keys=(qtipe == PREDICATE_FTS)
         )
+        logging.debug(f"Query {val} with {qtipe} gave {len(search_results)}")
 
         for notation in search_results:
             c = ctx.push()
@@ -129,7 +141,10 @@ def fts_eval(ctx, part):
         if not isinstance(t[0], Variable):
             continue
         if t[1] in (PREDICATE_FTS, PREDICATE_FTS_NOKEYS):
-            vars.append(t)
+            if isinstance(t[2], Literal):
+                vars.append(t)
+            else:
+                logging.error(f"Trying to do {t[1]} with non-Literal")
     if len(vars) > 0:
         return getq(ctx, vars)
     return evalBGP(ctx, part.triples)
@@ -294,6 +309,7 @@ class IconclassStore(Store):
     def triples(self, triple_pattern, context=None):
         self.triple_call_count += 1
         s, p, o = triple_pattern
+        logging.debug(f"{s}, {p}, {o}")
 
         if s is None:
             if p == RDF.type and o == SKOS.Concept:
