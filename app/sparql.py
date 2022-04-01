@@ -11,7 +11,7 @@ import logging
 
 app = FastAPI()
 G = ConjunctiveGraph(store="IconclassStore")
-QUERY_STATS = {"total": 0}
+QUERY_STATS = {}
 IC = Namespace("http://iconclass.org/")
 
 SERVICE_DESCRIPTION = """@prefix sd: <http://www.w3.org/ns/sparql-service-description#> .
@@ -43,8 +43,6 @@ async def sparql_get(
     query: Optional[str] = Query(None),
 ):
     background_tasks.add_task(rec_usage, request)
-    nonce = "".join([random.choice("0123456789abcdef") for x in range(20)])
-    QUERY_STATS[nonce] = {"start": time.time()}
 
     accept_header = request.headers.get("accept", "")
 
@@ -52,13 +50,14 @@ async def sparql_get(
         tmp_graph = Graph()
         tmp_graph.bind("ic", IC)
         tmp_graph.parse(data=SERVICE_DESCRIPTION, format="ttl")
-        tmp_graph.add(
-            (
-                IC.sparqlservice,
-                IC.querystats,
-                Literal(json.dumps(QUERY_STATS)),
+        for k, v in QUERY_STATS.items():
+            tmp_graph.add(
+                (IC[k], IC["querystart"], Literal(time.ctime(v.get("start", ""))))
             )
-        )
+            tmp_graph.add(
+                (IC[k], IC["queryend"], Literal(time.ctime(v.get("end", ""))))
+            )
+            tmp_graph.add((IC[k], IC["queryduration"], Literal(v.get("duration", ""))))
         if accept_header == "application/xml":
             return Response(
                 tmp_graph.serialize(format="xml"), media_type="application/xml"
@@ -68,11 +67,15 @@ async def sparql_get(
                 tmp_graph.serialize(format="turtle"), media_type="text/turtle"
             )
 
-    result = G.query(query)
+    nonce = "".join([random.choice("0123456789abcdef") for x in range(20)])
+    start_time = time.time()
+    QUERY_STATS[nonce] = {"start": time.time()}
 
-    total = QUERY_STATS["total"]
-    del QUERY_STATS[nonce]
-    QUERY_STATS["total"] = total + 1
+    result = G.query(query)
+    end_time = time.time()
+
+    QUERY_STATS[nonce]["end"] = end_time
+    QUERY_STATS[nonce]["duration"] = end_time - start_time
 
     if result.type == "CONSTRUCT":
         if accept_header == "application/ld+json":
@@ -117,6 +120,7 @@ def rec_usage(request: Request):
         "X-Forwarded-For": "127.0.0.1",
     }
     if xff:
+        logging.debug(f"Query from {xff}")
         headers["X-Forwarded-For"] = xff
     r = httpx.post(
         "https://plausible.io/api/event",
