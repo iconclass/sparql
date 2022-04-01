@@ -1,5 +1,5 @@
 from rdflib.plugins.sparql.results.jsonresults import JSONResultSerializer
-from rdflib import ConjunctiveGraph, Graph
+from rdflib import ConjunctiveGraph, Graph, URIRef, Namespace, Literal
 from fastapi.responses import JSONResponse
 from io import StringIO
 import json, httpx
@@ -7,10 +7,12 @@ from fastapi import FastAPI, Form, Query, Request, Response, BackgroundTasks
 from .store import IconclassStore
 import random, time
 from typing import Optional
+import logging
 
 app = FastAPI()
 G = ConjunctiveGraph(store="IconclassStore")
 QUERY_STATS = {"total": 0}
+IC = Namespace("http://iconclass.org/")
 
 SERVICE_DESCRIPTION = """@prefix sd: <http://www.w3.org/ns/sparql-service-description#> .
         @prefix ent: <http://www.w3.org/ns/entailment/> .
@@ -48,7 +50,15 @@ async def sparql_get(
 
     if not query:
         tmp_graph = Graph()
+        tmp_graph.bind("ic", IC)
         tmp_graph.parse(data=SERVICE_DESCRIPTION, format="ttl")
+        tmp_graph.add(
+            (
+                IC.sparqlservice,
+                IC.querystats,
+                Literal(json.dumps(QUERY_STATS)),
+            )
+        )
         if accept_header == "application/xml":
             return Response(
                 tmp_graph.serialize(format="xml"), media_type="application/xml"
