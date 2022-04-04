@@ -57,7 +57,16 @@ async def sparql_get(
             tmp_graph.add(
                 (IC[k], IC["queryend"], Literal(time.ctime(v.get("end", ""))))
             )
-            tmp_graph.add((IC[k], IC["queryduration"], Literal(v.get("duration", ""))))
+            tmp_graph.add(
+                (IC[k], IC["queryduration"], Literal(str(v.get("duration", ""))))
+            )
+            tmp_graph.add(
+                (
+                    IC[k],
+                    IC["triple_call_count"],
+                    Literal(v.get("triple_call_count", "")),
+                )
+            )
         if accept_header == "application/xml":
             return Response(
                 tmp_graph.serialize(format="xml"), media_type="application/xml"
@@ -71,11 +80,15 @@ async def sparql_get(
     start_time = time.time()
     QUERY_STATS[nonce] = {"start": time.time()}
 
+    start_triple_call_count = G.store.triple_call_count
     result = G.query(query)
     end_time = time.time()
 
+    QUERY_STATS[nonce]["triple_call_count"] = (
+        G.store.triple_call_count - start_triple_call_count
+    )
     QUERY_STATS[nonce]["end"] = end_time
-    QUERY_STATS[nonce]["duration"] = end_time - start_time
+    QUERY_STATS[nonce]["duration"] = round(end_time - start_time, 3)
 
     if result.type == "CONSTRUCT":
         if accept_header == "application/ld+json":
@@ -113,6 +126,7 @@ def homepage():
 
 
 def rec_usage(request: Request):
+    return
     xff = request.headers.get("x-forwarded-for")
     headers = {
         "Content-Type": "application/json",
