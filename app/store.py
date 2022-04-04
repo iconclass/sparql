@@ -15,8 +15,10 @@ PREDICATE_FTS = IC.search
 PREDICATE_FTS_NOKEYS = IC.searchnokeys
 DATA_PATH = os.environ.get("IC_DATA_PATH", "../data/")
 
-MAX_EMPTY_SUBJECTS_ITERATION = 9
-FTS_QUERY_LIMIT = 9
+MAX_EMPTY_SUBJECTS_ITERATION = 99
+FTS_QUERY_LIMIT = 99
+
+TRIPLE_CACHE = set()
 
 
 def get_cursor():
@@ -181,6 +183,7 @@ class IconclassStore(Store):
     def __init__(self, configuration=None, identifier=None):
         self.triple_call_count = 0
         self.NOTATIONS = read_n(DATA_PATH)
+        self.sorted_notations = sorted(self.NOTATIONS, key=lambda x: len(x))
         super().__init__(configuration, identifier)
 
     def n_from_uri(self, u):
@@ -192,6 +195,7 @@ class IconclassStore(Store):
         n = tmp[-1]
         if not n[0] in "0123456789":
             return
+        # TODO, need to handle keys and with names in here
         return self.NOTATIONS.get(unquote(n))
 
     def triple_notation(self, uriref, p, o):
@@ -233,12 +237,15 @@ class IconclassStore(Store):
             )
         if p_(SKOS.related) and "R" in obj:
             for related in obj.get("R"):
-                triples.append((N, SKOS.related, IC[quote(related)]))
+                if o is None or o == IC[quote(related)]:
+                    triples.append((N, SKOS.related, IC[quote(related)]))
         if p_(SKOS.broader) and "B" in obj:
-            triples.append((N, SKOS.broader, IC[quote(obj["B"])]))
+            if o is None or o == IC[quote(obj["B"])]:
+                triples.append((N, SKOS.broader, IC[quote(obj["B"])]))
         if p_(SKOS.narrower) and "C" in obj:
             for child in obj.get("C", []):
-                triples.append((N, SKOS.narrower, IC[quote(child)]))
+                if os is None or o == IC[quote(child)]:
+                    triples.append((N, SKOS.narrower, IC[quote(child)]))
 
         cursor = get_cursor()
         if p_(SKOS.prefLabel):
@@ -298,18 +305,26 @@ class IconclassStore(Store):
                 yield (IC[quote(notation)], DC.subject, o), None
 
     def notations_iterator(self, p, o):
-        count = 0
-        for n in self.NOTATIONS:
-            count += 1
-            if count > MAX_EMPTY_SUBJECTS_ITERATION:
-                continue
+        for n in self.sorted_notations[:MAX_EMPTY_SUBJECTS_ITERATION]:
             for x in self.triple_notation(IC[quote(n)], p, o):
                 yield x
 
     def triples(self, triple_pattern, context=None):
+        s, p, o = triple_pattern
+        if s is None and o is None:
+            for ss, pp, oo in TRIPLE_CACHE.copy():
+                if pp == p:
+                    yield (ss, pp, oo), None
+            return
+        for x in self.triples_(triple_pattern, context):
+            TRIPLE_CACHE.add(x[0])
+            logging.debug(f"want: {s}, {p}, {o}")
+            logging.debug(f"got: {x[0][0]}, {x[0][1]}, {x[0][2]}")
+            yield x
+
+    def triples_(self, triple_pattern, context=None):
         self.triple_call_count += 1
         s, p, o = triple_pattern
-        logging.debug(f"{s}, {p}, {o}")
 
         if s is None:
             if p == RDF.type and o == SKOS.Concept:
