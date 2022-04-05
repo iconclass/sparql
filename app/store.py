@@ -311,7 +311,7 @@ class IconclassStore(Store):
 
     def triples(self, triple_pattern, context=None):
         s, p, o = triple_pattern
-        if s is None and o is None:
+        if s is None and o is None and not p is None:
             for ss, pp, oo in TRIPLE_CACHE.copy():
                 if pp == p:
                     yield (ss, pp, oo), None
