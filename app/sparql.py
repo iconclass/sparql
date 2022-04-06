@@ -126,7 +126,6 @@ def homepage():
 
 
 def rec_usage(request: Request):
-    return
     xff = request.headers.get("x-forwarded-for")
     headers = {
         "Content-Type": "application/json",
