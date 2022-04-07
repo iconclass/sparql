@@ -39,3 +39,43 @@ Work on this service has been done with support from [FIZ Karlsruhe Information 
 [Python Linked Data Fragment Server.](https://github.com/jermnelson/linked-data-fragments) Python Linked Data Fragment server using asyncio and Redis
 
 [ODTMP-TPF](https://github.com/benj-moreau/odmtp-tpf) Triple pattern matching over non-RDF datasources with inference
+
+[A Survey of RDF Stores & SPARQL Engines for Querying Knowledge Graphs](https://arxiv.org/pdf/2102.13027.pdf)
+
+## Desirable queries
+
+PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+
+CONSTRUCT {
+?uri a skos:Concept ;
+skos:prefLabel ?prefLabel ;
+skos:broader ?broader_uri ;
+skos:narrower ?narrower_uri ;
+skos:related ?related_uri .
+
+    ?broader_uri skos:prefLabel ?broader_prefLabel .
+    ?narrower_uri skos:prefLabel ?narrower_prefLabel .
+    ?related_uri skos:prefLabel ?related_prefLabel .
+
+}
+WHERE {
+?uri a skos:Concept ;
+skos:prefLabel ?prefLabel .
+
+    ?uri <http://iconclass.org/search> ?query .
+
+    OPTIONAL {
+        ?uri skos:broader ?broader_uri .
+        ?broader_uri skos:prefLabel ?broader_prefLabel .
+    }
+    OPTIONAL {
+        ?uri skos:narrower ?narrower_uri .
+        ?narrower_uri skos:prefLabel ?narrower_prefLabel .
+    }
+    OPTIONAL {
+        ?uri skos:related ?related_uri .
+        ?narrower_uri skos:prefLabel ?related_prefLabel .
+    }
+
+}
+LIMIT 1000
